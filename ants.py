@@ -19,7 +19,6 @@ qEXPLORE = 0.1
 
 # i and j are the indices for the node whose neighbors you want to
 #Modified from: https://stackoverflow.com/questions/15913489/python-find-all-neighbours-of-a-given-node-in-a-list-of-lists
-#FIX THIS
 def find_neighbors(graph, x, y, dist=1):
     neighbors = [row[max(0, x-dist):x+dist+1] for row in graph[max(0, y-1):y+dist+1]]
     neighbors = [elem for nlist in neighbors for elem in nlist]
@@ -28,7 +27,7 @@ def find_neighbors(graph, x, y, dist=1):
     if len(neighbors) == 9:
         for i in [0,1,2,3,4]:
             del neighbors[i]
-        directions = [0,1,2,3]
+        directions = [1,0,2,3]
     elif x == 0:
         for i in [1,1,3]:
             del neighbors[i]
@@ -36,7 +35,7 @@ def find_neighbors(graph, x, y, dist=1):
     elif x == 7:
         for i in [0,2,2]:
             del neighbors[i]
-        directions = [0,1,3]
+        directions = [1,0,3]
     return neighbors, directions
 
 #Ant Class
@@ -52,9 +51,9 @@ class Ant:
         #intersection - 1 if at an intersection, 0 if not
         self.intersection = 0
         #lay pheromone - 1 if laying pheromone, 0 otherwise
-        self.lay_pheromone = 1
+        self.pheromone = 1
         #list of nodes visited, in the order visited
-        self.visited = [(start_x, start_y)]
+        self.visited = []
 
         if random.randint(0, 1):
             self.end = END1
@@ -76,13 +75,59 @@ class Ant:
     def rank_edge(self, graph):
         #potential edges to move to (sorted by edge weights)
         edges, dirs = find_neighbors(graph, self.pos[0][0], self.pos[0][1])
-        print("Neighbors: ", edges)
-        print("Directions: ", dirs)
 
-        #sort both lists
+        #sort both lists in increasing weight order
         dirs = [x for _,x in sorted(zip(edges, dirs), reverse=True)]
         edges = sorted(edges, reverse=True)
-        print(edges, dirs)
+        #remove all edges that are less than 0
+        real_edges = [item for item in edges if item >= 0]
+        #remove invalid directions
+        diff = len(edges) - len(real_edges)
+        if (diff != 0):
+            dirs = dirs[0:-diff]
+
+        print("Neighbors: ", real_edges)
+        print("Directions: ", dirs)
+
+        #generate random number between 0 and 1
+        rn = random.uniform(0,1)
+        #choose the next edge
+        #base case: only one option
+        #if len(real_edges) == 1:
+        self.move(graph, self.pos[0][0], self.pos[0][1], dirs[0])
+        #if (rn > qEXPLORE):
+
+    #Update pheromone map (if allowed), current ant position, last coordinate, deadend option, visited nodes
+    #TODO: updae deadend and intersection
+    def move(self, graph, x, y, dir):
+        #left
+        if dir == 0:
+            if self.pheromone:
+                graph[y][x-1] = graph[y][x-1] + qADD
+            self.last_coord = self.pos
+            self.visited.append(self.pos[0])
+            self.pos = (self.pos[0][0]-1, self.pos[0][0])
+        #up
+        elif dir == 1:
+            if self.pheromone:
+                graph[y-1][x] = graph[y-1][x] + qADD
+            self.last_coord = self.pos
+            self.visited.append(self.pos[0])
+            self.pos = (self.pos[0][0]-1, self.pos[0][0])
+        #right
+        elif dir == 2:
+            if self.pheromone:
+                graph[y][x+1] = graph[y][x+1] + qADD
+            self.last_coord = self.pos
+            self.visited.append(self.pos[0])
+            self.pos = (self.pos[0][0]-1, self.pos[0][0])
+        #down
+        elif dir == 3:
+            if self.pheromone:
+                graph[y+1][x] = graph[y+1][x] + qADD
+            self.last_coord = self.pos
+            self.visited.append(self.pos[0])
+            self.pos = (self.pos[0][0]-1, self.pos[0][0])
 
 
 #Read the graph from a text file given as input
@@ -102,11 +147,12 @@ def main():
     print(graph)
     #Create 100 ants
     ants = []
-    for i in range(1):
+    for i in range(100):
         ants.append(Ant(random.randint(0, int(COLS)-1), 2))
     for a in ants:
         a.path()
         a.rank_edge(graph)
+    print(graph)
 
 
 
