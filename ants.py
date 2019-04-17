@@ -18,10 +18,26 @@ qDECAY = 0.1
 qEXPLORE = 0.1
 
 # i and j are the indices for the node whose neighbors you want to
-#Found here: https://stackoverflow.com/questions/15913489/python-find-all-neighbours-of-a-given-node-in-a-list-of-lists
+#Modified from: https://stackoverflow.com/questions/15913489/python-find-all-neighbours-of-a-given-node-in-a-list-of-lists
 #FIX THIS
-def find_neighbors(graph, i, j, dist=1):
-    return [row[max(0, j-dist):j+dist+1] for row in graph[max(0, i-1):i+dist+1]]
+def find_neighbors(graph, x, y, dist=1):
+    neighbors = [row[max(0, x-dist):x+dist+1] for row in graph[max(0, y-1):y+dist+1]]
+    neighbors = [elem for nlist in neighbors for elem in nlist]
+    directions = [] #direction guide: 0 = left, 1 = up, 2 = right, 3 = down
+    #remove diagonal neighbors
+    if len(neighbors) == 9:
+        for i in [0,1,2,3,4]:
+            del neighbors[i]
+        directions = [0,1,2,3]
+    elif x == 0:
+        for i in [1,1,3]:
+            del neighbors[i]
+        directions = [1,2,3]
+    elif x == 7:
+        for i in [0,2,2]:
+            del neighbors[i]
+        directions = [0,1,3]
+    return neighbors, directions
 
 #Ant Class
 class Ant:
@@ -59,9 +75,14 @@ class Ant:
     #rank edge algorithm
     def rank_edge(self, graph):
         #potential edges to move to (sorted by edge weights)
-        edges = find_neighbors(graph, self.pos[0][0], self.pos[0][1])
-        print(edges)
-        edge_weights = []
+        edges, dirs = find_neighbors(graph, self.pos[0][0], self.pos[0][1])
+        print("Neighbors: ", edges)
+        print("Directions: ", dirs)
+
+        #sort both lists
+        dirs = [x for _,x in sorted(zip(edges, dirs), reverse=True)]
+        edges = sorted(edges, reverse=True)
+        print(edges, dirs)
 
 
 #Read the graph from a text file given as input
