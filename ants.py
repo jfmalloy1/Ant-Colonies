@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 #Text file containing the graph
 GRAPH = sys.argv[1]
@@ -13,7 +14,7 @@ END2 = [(int(sys.argv[5]), int(sys.argv[6]))]
 #amount of pheromone deposited
 qADD = 1
 #rate of pheromone evaporation
-qDECAY = 0.5
+qDECAY = 1
 #exploration rate
 qEXPLORE = 0.9
 
@@ -45,7 +46,7 @@ def find_neighbors(graph, x, y, dist=1):
         directions = [0,3]
     #if in the bottom right corner
     elif x == COLS-1 and y == COLS-1:
-        for i in [0,3]:
+        for i in [0,2]:
             del neighbors[i]
         directions = [1,0]
     #if on the top-most edge
@@ -210,24 +211,38 @@ class Ant:
 
 #Read the graph from a text file given as input
 def read_graph():
-    #X coordinate - always 0
-    #Y coordinate - the number of data points along the row
-    matrix = np.empty((0,int(COLS)))
-    with open(GRAPH) as graph:
-        for l in graph:
-            #Append the floating point versions of each point in the matrix
-            matrix = np.append(matrix, [list(map(float, l.split()))], axis=0)
+    #if it is the European Road Network, do this - otherwise...
+    if (GRAPH == "euro.txt"):
+        #make a 1174 by 1174 0 matrix
+        matrix = np.empty((COLS, COLS))
+        #make all coordinates in euro.txt 10s
+        with open("euro.txt") as euro:
+            coords = []
+            for line in euro:
+                coords.append([int(i) for i in line.split()])
+            for c in coords:
+                matrix[c[0]-1, c[1]-1] = 10
+        return matrix
+    else:
+        #X coordinate - always 0
+        #Y coordinate - the number of data points along the row
+        matrix = np.empty((0,int(COLS)))
+        with open(GRAPH) as graph:
+            for l in graph:
+                #Append the floating point versions of each point in the matrix
+                matrix = np.append(matrix, [list(map(float, l.split()))], axis=0)
 
-    return matrix
+        return matrix
 
 def main():
     graph = read_graph()
-    print(graph)
+    #print(graph)
+    plt.imshow(graph, cmap="hot", interpolation = "nearest")
+    plt.show()
     #Create 100 ants
     ants = []
     for i in range(100):
-        numbers = list(range(0,5))
-        numbers.append(6)
+        numbers = [i for i, x in enumerate(graph[END1[0][1]]) if x == 10]
         ants.append(Ant(random.choice(numbers), END1[0][1]))
     for i in range(50):
         for a in ants:
@@ -238,12 +253,18 @@ def main():
 
         #multiply graph by pheromone decay rate
         graph = graph*qDECAY
-    print
-    for l in graph:
-        for n in l:
-            print(round(n, 2), end="\t")
-        print()
 
+    # for l in graph:
+    #     for n in l:
+    #         print(round(n, 2), end="\t")
+    #     print()
+    a = np.ma.masked_where(graph == 0, graph)
+    cmap = plt.cm.OrRd
+    cmap.set_bad(color="white")
+    plt.imshow(graph,cmap=cmap,interpolation = "nearest")
+    plt.show()
+    # plt.hist(graph.ravel(), bins=256, range=(0, 200), fc="k", ec="k")
+    # plt.show()
 
 
 if __name__ == "__main__":
