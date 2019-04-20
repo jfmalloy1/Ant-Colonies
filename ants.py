@@ -14,7 +14,7 @@ END2 = [(int(sys.argv[5]), int(sys.argv[6]))]
 #amount of pheromone deposited
 qADD = 1
 #rate of pheromone evaporation
-qDECAY = 1
+qDECAY = .9
 #exploration rate
 qEXPLORE = 0.9
 
@@ -83,6 +83,12 @@ class Ant:
         self.pheromone = 1
         #list of nodes visited, in the order visited
         self.visited = []
+        #flag if the ant made it through the path
+        self.completed = False
+        #number of moves an ant takes
+        self.moves = 0
+        #path entropy calculation
+        self.path_entropy = 1
 
         if random.randint(0, 1):
             self.end = END1
@@ -97,8 +103,17 @@ class Ant:
     def check_end(self):
         if self.pos == self.end and self.end == END1:
             self.end = END2
+            return True
         if self.pos == self.end and self.end == END2:
             self.end = END1
+
+            return True
+
+    #See if there is a path from one end to the other
+    def check_path_end(self):
+        self.end=[(END2[0][0]-2, END2[0][1])]
+        if self.pos == self.end:
+            self.completed = True
 
     #rank edge algorithm
     def rank_edge(self, graph):
@@ -112,6 +127,11 @@ class Ant:
         real_edges = [item for item in edges if item >= 0]
         #necessary for random selection later
         real_edges = np.array(real_edges)
+        #calculate probability of picking the max edge
+        edge_prob = max(real_edges) / sum(real_edges)
+        #multiply current path entropy (if the path is not completed)
+        if not self.completed:
+            self.path_entropy *= edge_prob
         #add one to all edges (necessary for random selection)
         real_edges += 1
         #remove invalid directions
@@ -137,7 +157,7 @@ class Ant:
             #randomly select max in case of ties
             self.move(graph, self.pos[0][0], self.pos[0][1], dirs[np.random.choice(np.flatnonzero(a = real_edges.max()))], dirs)
         #next step - rn between qEXPLORE and qEXPLORE^2
-        elif(rn < qEXPLORE**2):
+        elif(rn < qEXPLORE):
             #remove maximum value
             real_edges = np.array(list(filter(lambda a: a != max(real_edges), real_edges)))
             dirs = dirs[len(dirs) - len(real_edges):]
@@ -149,10 +169,29 @@ class Ant:
             real_edges = np.array(list(filter(lambda a: a != max(real_edges), real_edges)))
             self.move(graph, self.pos[0][0], self.pos[0][1], dirs[np.random.choice(np.flatnonzero(a = real_edges.max()))], dirs)
 
+    #add pheromone to the coordinate in a specific direction, but do not move there
+    def explore(self, graph, x, y, dir):
+        if dir == 0:
+            if self.pheromone:
+                graph[y][x-1] = graph[y][x-1] + qADD
+        elif dir == 1:
+            if self.pheromone:
+                graph[y-1][x] = graph[y-1][x] + qADD
+        elif dir == 2:
+            if self.pheromone:
+                graph[y][x+1] = graph[y][x+1] + qADD
+        elif dir == 3:
+            if self.pheromone:
+                graph[y+1][x] = graph[y+1][x] + qADD
+
     #Update pheromone map (if allowed), current ant position, last coordinate, deadend option, visited nodes
     #If the last coord is the only option to move (len(dirs) == 1), deadend
     #If there are more than one option to move (len(dirs) > 2), intersection and pheromone is turned/kept on
     def move(self, graph, x, y, dir, dirs):
+        #add to the number of moves if it is still searching
+        if not self.completed:
+            self.moves += 1
+
         if (len(dirs) >= 2):
             self.pheromone = 1
 
@@ -170,7 +209,6 @@ class Ant:
                 self.last_coord = self.pos
         #up
         elif dir == 1:
-
             if self.pheromone:
                 graph[y-1][x] = graph[y-1][x] + qADD
             if (self.last_coord != [(self.pos[0][0], self.pos[0][1]-1)]):
@@ -234,32 +272,73 @@ def read_graph():
 
         return matrix
 
-def main():
-    graph = read_graph()
-    #print(graph)
-    plt.imshow(graph, cmap="hot", interpolation = "nearest")
-    plt.show()
-    #Create 100 ants
+#Defines if a graph successfully creates a path between both ends
+def success_calc(graph):
+    total_ants = 100
+    #path entropy
+    success_ants = 0
+    #total moves (will be used for the average)
+    total_moves = 0
+    #path entropy
+    total_path_entropy = 0
+    p_e = 1
     ants = []
-    for i in range(100):
-        numbers = [i for i, x in enumerate(graph[END1[0][1]]) if x == 10]
-        ants.append(Ant(random.choice(numbers), END1[0][1]))
-    for i in range(50):
+    move = True
+    for i in range(total_ants):
+        ants.append(Ant(END1[0][0], END1[0][1]))
+    for i in range(200):
         for a in ants:
-            #move according to rankedge algorithm
             a.rank_edge(graph)
-            #check if the ant has reached the end
-            a.check_end()
+            a.check_path_end()
 
-        #multiply graph by pheromone decay rate
-        graph = graph*qDECAY
+    for a in ants:
+        if a.completed:
+            success_ants += 1
+            total_path_entropy += a.path_entropy
+        total_moves += a.moves
+    return float(success_ants) / total_ants, float(total_path_entropy) / total_ants, float(total_moves) / total_ants
 
-    # for l in graph:
-    #     for n in l:
-    #         print(round(n, 2), end="\t")
-    #     print()
-    a = np.ma.masked_where(graph == 0, graph)
-    cmap = plt.cm.OrRd
+
+def main():
+    og_graph = read_graph()
+    #print(graph)
+    plt.imshow(og_graph, cmap="hot", interpolation = "nearest")
+    plt.show()
+    #repeat analyses
+    total_success = 0
+    total_path_entropy = 0
+    total_moves = 0
+    repeat = 10
+    for r in range(10):
+        print(float(r) / repeat)
+        graph = read_graph()
+        ants = []
+        #Create 100 ants
+        for i in range(100):
+            numbers = [i for i, x in enumerate(graph[END1[0][1]]) if x == 10]
+            ants.append(Ant(random.choice(numbers), END1[0][1]))
+        for i in range(200):
+            for a in ants:
+                #move according to rankedge algorithm
+                a.rank_edge(graph)
+                #check if the ant has reached the end
+                a.check_end()
+
+            #multiply graph by pheromone decay rate
+            graph = graph*qDECAY
+
+        success, path_entropy, moves = success_calc(graph)
+        total_success += success
+        total_path_entropy = path_entropy
+        total_moves = moves
+        #add graph to og_graph
+        og_graph = og_graph + graph
+
+    print("Successful ants: ", total_success / repeat)
+    print("Path Entropy: ", total_path_entropy / repeat)
+    print("Average moves: ", total_moves / repeat)
+    a = np.ma.masked_where(og_graph == 0, og_graph)
+    cmap = plt.cm.hot
     cmap.set_bad(color="white")
     plt.imshow(graph,cmap=cmap,interpolation = "nearest")
     plt.show()
