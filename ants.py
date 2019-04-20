@@ -128,7 +128,10 @@ class Ant:
         #necessary for random selection later
         real_edges = np.array(real_edges)
         #calculate probability of picking the max edge
-        edge_prob = max(real_edges) / sum(real_edges)
+        if (sum(real_edges) != 0):
+            edge_prob = max(real_edges) / sum(real_edges)
+        else:
+            edge_prob = 0.25
         #multiply current path entropy (if the path is not completed)
         if not self.completed:
             self.path_entropy *= edge_prob
@@ -250,11 +253,12 @@ class Ant:
 #Read the graph from a text file given as input
 def read_graph():
     #if it is the European Road Network, do this - otherwise...
-    if (GRAPH == "euro.txt"):
+    tests = ["euro.txt", "air.txt", "usa.txt"]
+    if (GRAPH in tests):
         #make a 1174 by 1174 0 matrix
         matrix = np.empty((COLS, COLS))
         #make all coordinates in euro.txt 10s
-        with open("euro.txt") as euro:
+        with open(GRAPH) as euro:
             coords = []
             for line in euro:
                 coords.append([int(i) for i in line.split()])
@@ -286,7 +290,7 @@ def success_calc(graph):
     move = True
     for i in range(total_ants):
         ants.append(Ant(END1[0][0], END1[0][1]))
-    for i in range(200):
+    for i in range(500):
         for a in ants:
             a.rank_edge(graph)
             a.check_path_end()
@@ -309,15 +313,15 @@ def main():
     total_path_entropy = 0
     total_moves = 0
     repeat = 10
-    for r in range(10):
+    for r in range(1):
         print(float(r) / repeat)
         graph = read_graph()
         ants = []
         #Create 100 ants
         for i in range(100):
-            numbers = [i for i, x in enumerate(graph[END1[0][1]]) if x == 10]
-            ants.append(Ant(random.choice(numbers), END1[0][1]))
-        for i in range(200):
+            numbers = np.where(graph == 10)
+            ants.append(Ant(random.choice(numbers[0]), random.choice(numbers[1][:-1])))
+        for i in range(500):
             for a in ants:
                 #move according to rankedge algorithm
                 a.rank_edge(graph)
